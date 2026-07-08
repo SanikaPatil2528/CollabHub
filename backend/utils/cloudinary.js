@@ -17,7 +17,7 @@ const uploadOnCloudinary = async (localFilePath) => {
         });
 
         // remove from local server storage
-        fs.unlink(localFilePath);
+        fs.unlinkSync(localFilePath);
         return response;
     } catch (error) {
         if(fs.existsSync(localFilePath)) fs.unlinkSync(localFilePath);  // unlink -> delete, sync-> delete the file then only proceed

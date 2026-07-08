@@ -4,12 +4,12 @@ const invitationSchema = new Schema(
     {
         project:{
             type:Schema.Types.ObjectId,
-            ref="Project",
+            ref:"Project",
             required:true
         },
         inviter:{
             type:Schema.Types.ObjectId,
-            ref="User",
+            ref:"User",
             required:true
         },
         inviteeEmail:{

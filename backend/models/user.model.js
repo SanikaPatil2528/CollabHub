@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+import mongoose, {Schema} from "mongoose";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 
@@ -37,7 +37,7 @@ const userSchema = new Schema(
                 message: "Password must be atleast 8 characters long and contain atleast one uppercase letter, one lowercase letter, ans one number."
             }
         },
-        refresToken:{
+        refreshToken:{
             type:String
         },
         skills:{
@@ -76,10 +76,9 @@ function isPasswordValid(password){
 
 // Hook to hash password right before saving to mongoDB
 
-userSchema.pre("save",async function(next){
-    if(!this.isModified("password")) return next();
+userSchema.pre("save",async function(){
+    if(!this.isModified("password")) return ;
     this.password= await bcrypt.hash(this.password,10); // 10-> salt(rounds of hashing)
-    next();
 });
 
 // custom method to validate plain text password against database hashed password

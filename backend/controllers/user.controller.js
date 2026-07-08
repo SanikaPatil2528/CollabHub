@@ -4,14 +4,25 @@ import {ApiResponse} from "../utils/ApiResponse.js";
 import {User} from "../models/user.model.js";
 import {Invitation} from "../models/invitation.model.js";
 import {Project} from "../models/project.model.js";
+import { uploadOnCloudinary } from "../utils/cloudinary.js";
 
 
-export const registerUser = asyncHandler(async(requestAnimationFrame,res)=>{
-    const {username,email,fullName,password}=req.body;
+export const registerUser = asyncHandler(async(req,res)=>{
+    console.log("registerUser controller reached");
+    const {username, email, fullName, password, bio, skills}=req.body;
 
-    if(
-        [username,email,fullName,password].some((field)=>field?.trim()==="")
-    ) throw new ApiError(400,"All fields are required");
+    if (
+        [username, email, fullName, password].some((field) => field?.trim() === "")
+    ) {
+        throw new ApiError(400, "Username, email, fullName, password, and avatar are strictly required.");
+    }
+
+    const avatarLocalPath = req.file?.path;
+    console.log("FILE:", req.file);
+    console.log("PATH:", avatarLocalPath);
+    if (!avatarLocalPath) {
+        throw new ApiError(400, "Avatar image file is strictly required.");
+    }
 
     const existedUser = await User.findOne({
         $or: [{username},{email}]
@@ -19,11 +30,20 @@ export const registerUser = asyncHandler(async(requestAnimationFrame,res)=>{
 
     if(existedUser) throw new ApiError(409,"User with this email or username already exists");
 
-    const user=await User.create({
-        username:username.toLowercase(),
-        email:email.toLowercase(),
+    const cloudinaryResponse = await uploadOnCloudinary(avatarLocalPath);
+
+    if (!cloudinaryResponse || !cloudinaryResponse.url) {
+        throw new ApiError(500, "Failed to upload avatar to Cloudinary. Please try again.");
+    }
+
+    const user = await User.create({
+        username: username.toLowerCase(),
+        email: email.toLowerCase(),
         fullName,
-        password
+        password,
+        avatar:cloudinaryResponse.url, // Saved as a string url
+        bio,    // Defaults to "" if not sent
+        skills  // Defaults to [] if not sent
     });
 
     const createdUser=await User.findById(user._id).select("-password");
@@ -60,7 +80,8 @@ const generateAccessAndRefreshTokens=async (userId) => {
 
         return {accessToken, refreshToken};
     } catch (error) {
-        throw new ApiError(500,"Something went wrong while generating tokens");
+        console.error("Token generation error:", error);
+        throw error;
     }
 }
 
@@ -69,7 +90,7 @@ export const loginUser= asyncHandler(async(req,res)=>{
     if(!email && !username) throw new ApiError(400,"Username or email is required");
 
     const user=await User.findOne({
-        $or: [{email:email?.toLowercase()}, {username: username?.toLowercase()}]
+        $or: [{email:email?.toLowerCase()}, {username: username?.toLowerCase()}]
     });
     if(!user) throw new ApiError(404,"User does not exist");
 
