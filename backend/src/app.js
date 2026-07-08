@@ -22,4 +22,13 @@ app.use(express.static("public"));
 app.use(cookieParser());
 
 
+// =========================================================================
+// ROUTE DECLARATIONS
+// =========================================================================
+import userRouter from "../routes/user.route.js";
+
+// this mounts our router. The full URL will become http://localhost:5000/api/v1/users/register
+app.use("/api/v1/users",userRouter);
+
+
 export {app};
