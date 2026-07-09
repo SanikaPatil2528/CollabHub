@@ -146,3 +146,58 @@ export const deleteProject = asyncHandler(async(req,res)=>{
     .status(200)
     .json(new ApiResponse(200,{},"Project workspace completely torn down"));
 });
+
+export const leaveProject= asyncHandler(async(req,res)=>{
+    const {projectId}=req.params;
+    const project=await Project.findById(projectId);
+    if(!project) throw new ApiError(404,"Project workspace not found");
+
+    // owner cannot leave the project
+    if(project.owner.toString()===req.user._id) throw new ApiError(400,"As the project owner, you cannot leave this project. You must delete the project or transfer ownership.");
+
+    const isMember=project.members.includes(req.user._id);
+    if(!isMember) throw new ApiError(400,"You are not a registered member of this project workspace");
+
+    // automatically pull the user out of the project's member array
+    await Project.findByIdAndUpdate(
+        projectId,
+        {
+            $pull:{members:req.user._id}
+        },
+        {new:true}
+    );
+
+    return res
+    .status(200)
+    .json(new ApiResponse(200,null,"You have successfully left the project workspace"));
+});
+
+export const removeMember = asyncHandler(async(req,res)=>{
+    const {projectId}=req.params;
+    const {memberId}=req.body;
+    if(!memberId) throw new ApiError(400,"Member ID to eject is required");
+
+    const project=await Project.findById(projectId);
+    if(!project) throw new ApiError(404,"Project workspace not found");
+
+    // only project owner can remove some member
+    if(project.owner.toString()!==req.user._id.toString()) throw new ApiError(403,"Forbidden: Only the project owner can remove team members");
+
+    // owner cannot remove himself
+    if(memberId===req.user._id.toString()) throw new ApiError(400,"You cannot remove yourself.");
+    
+    const isMember=project.members.includes(memberId);
+    if(!isMember) throw new ApiError(400,"The specified user is not a member of this project");
+
+    const updatedProject=await Project.findByIdAndUpdate(
+        projectId,
+        {
+            $pull:{members:memberId}
+        },
+        {new:true}
+    ).select("-password");
+
+    return res
+    .status(200)
+    .json(new ApiResponse(200,updatedProject,"Team member removed successfully from the workspace"));
+});

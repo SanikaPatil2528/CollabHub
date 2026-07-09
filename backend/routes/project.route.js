@@ -4,7 +4,9 @@ import {
     getProjectDetails,
     getUserProjects,
     updateProjectDetails,
-    deleteProject
+    deleteProject,
+    removeMember,
+    leaveProject
 } from "../controllers/project.controller.js";
 import {verifyJWT} from "../middlewares/auth.middleware.js";
 
@@ -23,5 +25,8 @@ router.route("/:projectId")
     .get(getProjectDetails)
     .patch(updateProjectDetails)
     .delete(deleteProject);
+
+router.route("/:projectId/leave").post(leaveProject);
+router.route("/:projectId/remove-member").patch(removeMember);
 
 export default router;
