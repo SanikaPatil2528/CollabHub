@@ -1,18 +1,33 @@
 import {Router} from "express";
-import { registerUser,loginUser,logoutUser } from "../controllers/user.controller.js";
+import { registerUser,
+    loginUser,
+    logoutUser,
+    refreshAccessToken,
+    updateAccountDetails,
+    updateUserAvatar,
+    getCurrentUser
+  } from "../controllers/user.controller.js";
 import {verifyJWT} from "..//middlewares/auth.middleware.js";
 import { upload } from "../middlewares/multer.middleware.js";
 
 const router=Router();
 
-// Public routes -- anyone can access these
+
+// Public routes(Unprotected) -- anyone can access these
 router.route("/register").post(
     upload.single("avatarLocalPath"), 
     registerUser
 );;
 router.route("/login").post(loginUser);
+router.route("/refresh-token").post(refreshAccessToken);
+
 
 // Protected routes (requires a valid JWT access token in cookies/headers)
 router.route("/logout").post(verifyJWT, logoutUser);
+router.route("/current-user").get(verifyJWT, getCurrentUser);
+router.route("/update-account").patch(verifyJWT, updateAccountDetails);
+
+router.route("/update-avatar").patch(verifyJWT,upload.single("avatarLocalPath"),updateUserAvatar);
+
 
 export default router;

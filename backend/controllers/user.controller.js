@@ -5,6 +5,7 @@ import {User} from "../models/user.model.js";
 import {Invitation} from "../models/invitation.model.js";
 import {Project} from "../models/project.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
+import jwt from "jsonwebtoken";
 
 
 export const registerUser = asyncHandler(async(req,res)=>{
@@ -146,4 +147,112 @@ export const logoutUser=asyncHandler(async(req,res)=>{
         .clearCookie("accessToken",options)
         .clearCookie("refreshToken",options)
         .json(new ApiResponse(200,{},"User logged out successfully"));
+});
+
+export const refreshAccessToken = asyncHandler(async(req,res)=>{
+    const incomingRefreshToken= req.cookies.refreshToken || req.body.refreshToken;
+    if(!incomingRefreshToken) throw new ApiError(401,"Unauthorized request: No refresh token provided");
+
+    try {
+        const decodedToken = jwt.verify(incomingRefreshToken, process.env.REFRESH_TOKEN_SECRET);
+        const user=await User.findById(decodedToken?._id);
+        if(!user) throw new ApiError(401,"Invalid Refresh token");
+
+        if(incomingRefreshToken!==user.refreshToken) throw new ApiError(401,"Refresh token is expired or already used");
+
+        // generate new tokens (Refresh token rotation)
+        const {accessToken, refreshToken: newRefreshToken}=await generateAccessAndRefreshTokens(user._id);
+
+        const options={
+            httpOnly:true,
+            secure: process.env.NODE_ENV==="production",
+            sameSite:"strict"
+        }
+
+        return res
+        .status(200)
+        .cookie("accessToken",accessToken,options)
+        .cookie("refreshToken",newRefreshToken,options)
+        .json(
+            new ApiResponse(
+                200,
+                {accessToken,refreshToken:newRefreshToken},
+                "Access token refreshed successfully"
+            )
+        );
+    } catch (error) {
+        throw new ApiError(401,error?.message || "Invalid refresh token");
+    }
+});
+
+export const updateAccountDetails = asyncHandler(async(req,res)=>{
+    const {fullName,bio,skills}=req.body;
+    if(!fullName || fullName.trim()==="") throw new ApiError(400,"Full name is required");
+
+    // since this is a protected route, req.user is guaranteed by verifyJWT middleware
+    const user=await User.findByIdAndUpdate(
+        req.user?._id,
+        {
+            $set:{
+                fullName,
+                bio: bio || "",
+                skills: Array.isArray(skills) ? skills: []
+            }
+        },
+        {new :true} // returns the modified document instead of the old one
+    ).select("-password -refreshToken");
+
+    return res
+    .status(200)
+    .json(new ApiResponse(
+        200,
+        user,
+        "Account details updated succcessfully"
+    ));
+});
+
+export const updateUserAvatar = asyncHandler(async(req,res)=>{
+    const avatarLocalPath=req.file?.path;
+    if(!avatarLocalPath) throw new ApiError(400,"Avatar file is missing");
+
+    const avatar=await uploadOnCloudinary(avatarLocalPath);
+    if(!avatar.url) throw new ApiError(500,"Error while uploading avatar to cloud server");
+
+    const user= await User.findByIdAndUpdate(
+        req.user?._id,
+        {
+            $set:{
+                avatar:avatar.url
+            }
+        },
+        {new:true}
+    ).select("-password -refreshToken");
+
+    /* 💡 Production Note: In a real-world app, you should write a cleanup hook 
+       here using `cloudinary.v2.uploader.destroy()` to delete the user's *old* profile image 
+       so your cloud storage asset count doesn't overflow with junk data.
+    */
+
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(
+            200,
+            user,
+            "Avatar image updated successfully"
+        )
+    );
+});
+
+export const getCurrentUser = asyncHandler(async(req,res)=>{
+    // because verifyJWT already fetched the user object, we dont need a DB query here
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(
+            200,
+            req.user,
+            "Current user fetched successfully"
+        )
+    );
 });
