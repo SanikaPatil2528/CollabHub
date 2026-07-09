@@ -33,5 +33,8 @@ app.use("/api/v1/users",userRouter);
 import projectRouter from "../routes/project.route.js";
 app.use("/api/v1/projects",projectRouter);
 
+import invitationRouter from "../routes/invitation.route.js";
+app.use("/api/v1/invitations",invitationRouter);
+
 
 export {app};

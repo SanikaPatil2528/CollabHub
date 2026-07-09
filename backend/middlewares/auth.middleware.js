@@ -22,6 +22,6 @@ export const verifyJWT = asyncHandler(async(req,_,next)=>{
         next(); // pass control smoothly to the next controller function
 
     } catch (error) {
-        throw new ApiError(401,eror?.message || "Invalid access token");
+        throw new ApiError(401,error?.message || "Invalid access token");
     }
 });
