@@ -28,11 +28,10 @@ app.use(cookieParser());
 import userRouter from "../routes/user.route.js";
 
 // this mounts our router. The full URL will become http://localhost:5000/api/v1/users/register
-app.use((req, res, next) => {
-    console.log("Incoming request:", req.method, req.originalUrl);
-    next();
-});
 app.use("/api/v1/users",userRouter);
+
+import projectRouter from "../routes/project.route.js";
+app.use("/api/v1/projects",projectRouter);
 
 
 export {app};
