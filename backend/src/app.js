@@ -36,5 +36,8 @@ app.use("/api/v1/projects",projectRouter);
 import invitationRouter from "../routes/invitation.route.js";
 app.use("/api/v1/invitations",invitationRouter);
 
+import taskRouter from "../routes/task.route.js";
+app.use("/api/v1/tasks",taskRouter);
+
 
 export {app};

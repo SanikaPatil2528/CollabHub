@@ -2,6 +2,16 @@ import mongoose,{Schema} from "mongoose";
 
 const taskSchema = new Schema(
     {
+        project:{
+            type:Schema.Types.ObjectId,
+            ref:"Project",
+            required:[true,"A task must be mapped to a specific project workspace"]
+        },
+        createdBy:{
+            type:Schema.Types.ObjectId,
+            ref:"User",
+            required:[true,"The user who created this task must be recorded"]
+        },
         title:{
             type:String,
             required:[true,"Task title is required"],
@@ -43,5 +53,7 @@ const taskSchema = new Schema(
     }
 )
 
+// instead of scanning every task in database, mongoDB isolates the search to the target projects, pre-sorted by column layout
+taskSchema.index({project:1,status:1});
 
 export const Task=mongoose.model("Task",taskSchema);
