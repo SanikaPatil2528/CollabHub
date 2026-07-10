@@ -39,5 +39,8 @@ app.use("/api/v1/invitations",invitationRouter);
 import taskRouter from "../routes/task.route.js";
 app.use("/api/v1/tasks",taskRouter);
 
+import commentRouter from "../routes/comment.route.js";
+app.use("/api/v1/comments",commentRouter);
+
 
 export {app};

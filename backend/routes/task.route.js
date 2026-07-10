@@ -16,14 +16,17 @@ router.use(verifyJWT);
 
 router.route("/me").get(getMyTasks);
 
+// project level end-points
 router.route("/project/:projectId")
     .post(createTask)
     .get(getProjectTasks);
 
+// task-level end-points
 router.route("/:taskId")
     .patch(updateTaskDetails)
     .delete(deleteTask);
 
+// status end-point
 router.route("/:taskId/status").patch(updateTaskStatus);
 
 export default router;

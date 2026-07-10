@@ -2,24 +2,29 @@ import mongoose, {Schema} from "mongoose";
 
 const commentSchema = new Schema(
     {
+        project:{
+            type:Schema.Types.ObjectId,
+            ref:"Project",
+            required:[true,"Parent projectId is required"]
+        },
         content:{
             type:String,
             required:[true,"Comment content cannot be empty"],
             trim:true
         },
-        project:{
-            type:Schema.Types.ObjectId,
-            ref:"Project",
-            required:true
-        },
         task:{
             type:Schema.Types.ObjectId,
-            ref="Task"
+            ref:"Task",
+            default:null
         },
         author:{
             type:Schema.Types.ObjectId,
             ref:"User",
             required:true
+        },
+        editedAt:{
+            type:Date,
+            default:null
         }
     },
     {
