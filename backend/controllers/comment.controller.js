@@ -4,6 +4,7 @@ import {Project} from "../models/project.model.js";
 import {ApiError} from "../utils/ApiError.js";
 import {ApiResponse} from "../utils/ApiResponse.js";
 import {asyncHandler} from "../utils/asyncHandler.js";
+import { sendNotification } from "../utils/notificationHelper.js";
 
 // general or task specific
 export const createComment=asyncHandler(async(req,res)=>{
@@ -37,6 +38,31 @@ export const createComment=asyncHandler(async(req,res)=>{
         project:projectId,
         task:finalTaskId // stores objectId for task-chats, or null for project-chats
     });
+
+    // SEND NOTIFICATION
+    if (comment.task) {
+        // Scenario A: Comment belongs to a specific task card. Fetch the task to know who is assigned.
+        const taskDetails = await Task.findById(comment.task);
+        if (taskDetails && taskDetails.assignedTo.length > 0) {
+            await sendNotification({
+                recipients: taskDetails.assignedTo,
+                senderId: req.user._id,
+                type: "NEW_COMMENT",
+                message: `${req.user.username} commented on task "${taskDetails.title}": "${comment.content.substring(0, 20)}..."`,
+                projectId,
+                taskId: comment.task
+            });
+        }
+    } else {
+        // Scenario B: This is a general project-level chat message. Alert all workspace members.
+        await sendNotification({
+            recipients: project.members,
+            senderId: req.user._id,
+            type: "NEW_COMMENT",
+            message: `${req.user.username} posted in project chat: "${comment.content.substring(0, 20)}..."`,
+            projectId
+        });
+    }
 
     const populatedComment=await Comment.findById(comment._id).populate("author","username email avatar");
 

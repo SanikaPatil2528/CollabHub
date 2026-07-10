@@ -16,7 +16,7 @@ const notificationSchema = new Schema(
             type:String,
             required:true,
             enum:{
-                values: ["TASK_ASSIGNED","NEW_COMMENT","PROJECT_INVITE","SYSTEM"],
+                values: ["TASK_ASSIGNED","NEW_COMMENT","PROJECT_INVITE","TASK_STATUS_UPDATED"],
                 message:"{VALUE} is not a supported notification type"
             }
         },
@@ -31,11 +31,11 @@ const notificationSchema = new Schema(
         },
         project:{
             type:Schema.Types.ObjectId,
-            ref="Project" // Optional link to redirect the user to correct workspace
+            ref:"Project" // Optional link to redirect the user to correct workspace
         },
         task:{
             type:Schema.Types.ObjectId,
-            ref="Task" // Optional link to direct the user straight to the task card
+            ref:"Task" // Optional link to direct the user straight to the task card
         }
     },
     {
@@ -56,4 +56,4 @@ With a Compound Index: The line notificationSchema.index({ recipient: 1, isRead:
 Now, when a user logs in, MongoDB doesn't scan the database. It jumps straight to that user's section in the index, grabs only their unread notifications instantly, and ignores everything else. The 1 just means sort them in ascending order.
 */ 
 
-export const notificationSchema= mongoose.model("Notification",notificationSchema);
+export const Notification= mongoose.model("Notification",notificationSchema);

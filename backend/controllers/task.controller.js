@@ -3,6 +3,7 @@ import {Project} from "../models/project.model.js";
 import {ApiError} from "../utils/ApiError.js";
 import {ApiResponse} from "../utils/ApiResponse.js";
 import {asyncHandler} from "../utils/asyncHandler.js";
+import { sendNotification } from "../utils/notificationHelper.js";
 
 
 export const createTask = asyncHandler(async(req,res)=>{
@@ -26,6 +27,18 @@ export const createTask = asyncHandler(async(req,res)=>{
         priority:priority || "Medium",
         dueDate
     });
+
+    // SEND NOTIFICATION
+    if (task.assignedTo && task.assignedTo.length > 0) {
+        await sendNotification({
+            recipients: task.assignedTo,
+            senderId: req.user._id,
+            type: "TASK_ASSIGNED",
+            message: `You have been assigned to a new task: "${task.title}" by ${req.user.username}`,
+            projectId,
+            taskId: task._id
+        });
+    }
 
     return res
     .status(201)
@@ -72,6 +85,18 @@ export const updateTaskStatus=asyncHandler(async(req,res)=>{
 
     task.status=status;
     await task.save();
+
+    // SEND NOTIFICATION
+    if (task.assignedTo && task.assignedTo.length > 0) {
+        await sendNotification({
+            recipients: task.assignedTo,
+            senderId: req.user._id,
+            type: "TASK_STATUS_UPDATED",
+            message: `Task "${task.title}" was moved to "${status}" by ${req.user.username}`,
+            projectId: project._id, // project object fetched earlier in this controller
+            taskId: task._id
+        });
+    }
 
     return res
     .status(200)
@@ -130,6 +155,29 @@ export const updateTaskDetails=asyncHandler(async(req,res)=>{
     }
 
     const updatedTask=await task.save();
+
+    // 🔔 PLACE THE UPDATE NOTIFICATION TRIGGER HERE:
+    if (assignedTo && assignedTo.length > 0) {
+        // Map old assignees to strings so comparison loops work perfectly
+        const previousAssignees = oldTask.assignedTo.map(id => id.toString());
+
+        // Filter out anyone who was ALREADY on the task before this update
+        const newlyAssignedMembers = assignedTo.filter(
+            (memberId) => !previousAssignees.includes(memberId.toString())
+        );
+
+        // Only fire if there are actually new people added!
+        if (newlyAssignedMembers.length > 0) {
+            await sendNotification({
+                recipients: newlyAssignedMembers, // Alerts ONLY the newcomers!
+                senderId: req.user._id,
+                type: "TASK_ASSIGNED",
+                message: `You have been added to the task card: "${updatedTask.title}" by ${req.user.username}`,
+                projectId: updatedTask.project,
+                taskId: updatedTask._id
+            });
+        }
+    }
 
     return res
     .status(200)

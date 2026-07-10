@@ -5,6 +5,7 @@ import {ApiError} from "../utils/ApiError.js";
 import {ApiResponse} from "../utils/ApiResponse.js";
 import {asyncHandler} from "../utils/asyncHandler.js";
 import { sendEmail } from "../utils/sendEmail.js";
+import { sendNotification } from "../utils/notificationHelper.js";
 
 
 export const sendInvitation = asyncHandler(async(req,res)=>{
@@ -41,6 +42,17 @@ export const sendInvitation = asyncHandler(async(req,res)=>{
         inviteeEmail:emailClean,
         status:"Pending"
     });
+
+    // IF USER EXISTS ON PLATFORM, SEND IN-APP NOTIFICATION
+    if (targetUser) {
+        await sendNotification({
+            recipients: targetUser._id, // The target user account found
+            senderId: req.user._id,    // The project owner
+            type: "PROJECT_INVITE",
+            message: `You've been invited to join the project workspace: "${project.name}" by ${req.user.username}`,
+            projectId: project._id
+        });
+    }
 
     // background side-effect: dispatch workspace invitation email
     // we deliberately NOT USE 'await' here because we want this running in the background without blocking the client's HTTP JSON response
@@ -100,16 +112,34 @@ export const respondToinvitation=asyncHandler(async(req,res)=>{
     invitation.status=action;
     await invitation.save();
 
+    // Variable to track the project metadata for our notification message
+    let projectDetails = null;
+
     if(action==="Accepted"){
-        await Project.findByIdAndUpdate(
+        projectDetails=await Project.findByIdAndUpdate(
             invitation.project,
             {
                 $addToSet:{members:req.user._id} // atomic operator prevents double push bugs
             }
         );
     }
+    else {
+        // If declined, simply look up the project to grab its name for the alert message
+        projectDetails = await Project.findById(invitation.project);
+    }
+
+    // ALERT THE PROJECT OWNER ABOUT THE RESPONSE
+    if (projectDetails) {
+        await sendNotification({
+            recipients: invitation.inviter, // The owner who sent the original invite
+            senderId: req.user._id,        // The current logged-in user responding
+            type: "PROJECT_INVITE",        // Keeps it contextual to the invitation lifecycle
+            message: `${req.user.username} has ${action.toLowerCase()} your invitation to join workspace: "${projectDetails.name || "Workspace"}"`,
+            projectId: invitation.project
+        });
+    }
 
     return res
     .status(200)
     .json(new ApiResponse(200,invitation,`Invitation has been successfully ${action.toLowerCase()}`));
-})
+});

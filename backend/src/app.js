@@ -42,5 +42,8 @@ app.use("/api/v1/tasks",taskRouter);
 import commentRouter from "../routes/comment.route.js";
 app.use("/api/v1/comments",commentRouter);
 
+import notificationRouter from "../routes/notification.route.js";
+app.use("/api/v1/notifications",notificationRouter);
+
 
 export {app};
