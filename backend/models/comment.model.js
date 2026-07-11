@@ -32,5 +32,10 @@ const commentSchema = new Schema(
     }
 );
 
+// Indexing project for fast project-wide chat retrieval
+commentSchema.index({ project: 1, createdAt: -1 });
+
+// Indexing task for loading task-card comment timelines quickly
+commentSchema.index({ task: 1, createdAt: 1 });
 
 export const Comment=mongoose.model("Comment",commentSchema);
