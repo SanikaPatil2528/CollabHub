@@ -16,7 +16,7 @@ const notificationSchema = new Schema(
             type:String,
             required:true,
             enum:{
-                values: ["TASK_ASSIGNED","NEW_COMMENT","PROJECT_INVITE","TASK_STATUS_UPDATED"],
+                values: ["TASK_ASSIGNED","NEW_COMMENT","PROJECT_INVITE","TASK_STATUS_UPDATED","TASK_DETAILS_UPDATED"],
                 message:"{VALUE} is not a supported notification type"
             }
         },

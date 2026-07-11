@@ -9,6 +9,8 @@
  * @param {String} [options.taskId=null] - (Optional) The specific task card ID.
  */
 
+import { Notification } from "../models/notification.model.js";
+
 export const sendNotification = async({
     recipients,
     senderId,
@@ -43,6 +45,6 @@ export const sendNotification = async({
         await Promise.all(notificationPromises);
     } catch (error) {
         // Log the error locally so a failed notification background process doesn't crash the main user request thread.
-        console.error("Background Notification Error logged",error.message);
+        console.error("Background Notification Error logged: ",error.message);
     }
 };

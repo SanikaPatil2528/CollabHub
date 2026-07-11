@@ -63,7 +63,7 @@ export const sendInvitation = asyncHandler(async(req,res)=>{
             <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
                 <h2 style="color: #4F46E5; text-align: center;">CollabHub Invitation</h2>
                 <p>Hello,</p>
-                <p>Great news! <strong>${req.user.username}</strong> (<em>${req.user.email}</em>) has invited you to collaborate on their project workspace: <strong>"${project.name}"</strong>.</p>
+                <p>Great news! <strong>${req.user.username}</strong> (<em>${req.user.email}</em>) has invited you to collaborate on their project workspace: <strong>"${project.title}"</strong>.</p>
                 <blockquote><em>"${project.description || 'No description provided.'}"</em></blockquote>
                 <div style="text-align: center; margin: 30px 0;">
                     <a href="http://localhost:5173/dashboard/invitations" style="background-color: #4F46E5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Review Invitation Dashboard</a>

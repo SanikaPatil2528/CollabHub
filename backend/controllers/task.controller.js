@@ -4,6 +4,7 @@ import {ApiError} from "../utils/ApiError.js";
 import {ApiResponse} from "../utils/ApiResponse.js";
 import {asyncHandler} from "../utils/asyncHandler.js";
 import { sendNotification } from "../utils/notificationHelper.js";
+import {Notification} from "../models/notification.model.js";
 
 
 export const createTask = asyncHandler(async(req,res)=>{
@@ -110,6 +111,11 @@ export const updateTaskDetails=asyncHandler(async(req,res)=>{
     const task=await Task.findById(taskId);
     if(!task) throw new ApiError(404,"Task not found");
 
+    // 1. Snapshot the original state before updating
+    const previousAssignees = task.assignedTo.map(id => id.toString());
+    const originalTitle = task.title;
+    const originalDescription = task.description;
+
     const project=await Project.findById(task.project);
     if(!project) throw new ApiError(404,"Parent project workspace not found");
 
@@ -120,59 +126,71 @@ export const updateTaskDetails=asyncHandler(async(req,res)=>{
         throw new ApiError(403, "Access Forbidden: You cannot edit this task.");
     }
 
-    // dynamic updates
+     // Dynamic updates mapping
+    let detailsChanged = false;
+
     if (title !== undefined) {
         if (typeof title === "string" && title.trim() === "") {
             throw new ApiError(400, "Task title cannot be updated to an empty value.");
         }
-        task.title = title.trim();
+        const cleanedTitle = title.trim();
+        if (cleanedTitle !== originalTitle) detailsChanged = true;
+        task.title = cleanedTitle;
     }
 
     if (description !== undefined) {
         if (typeof description === "string" && description.trim() === "") {
             throw new ApiError(400, "Task description cannot be updated to an empty value.");
         }
-        task.description = description.trim();
+        const cleanedDesc = description.trim();
+        if (cleanedDesc !== originalDescription) detailsChanged = true;
+        task.description = cleanedDesc;
     }
 
     if (assignedTo !== undefined) {
         if (!Array.isArray(assignedTo)) {
             throw new ApiError(400, "assignedTo field must be a valid array of user IDs.");
         }
-        task.assignedTo = assignedTo; // Updates the multi-assignee list
+        task.assignedTo = assignedTo;
     }
 
     if (priority !== undefined) {
-        const validPriorities = ["Low", "Medium", "High", "Critical"];
-        if (!validPriorities.includes(priority)) {
-            throw new ApiError(400, `Invalid priority. Must be one of: ${validPriorities.join(", ")}`);
-        }
         task.priority = priority;
     }
 
     if (dueDate !== undefined) {
-        task.dueDate = dueDate; // Can be null if the team clears the deadline
+        task.dueDate = dueDate;
     }
 
     const updatedTask=await task.save();
+    // =========================================================================
+    // 🔔 SMART NOTIFICATION ROUTER
+    // =========================================================================
+    
+    // SCENARIO A: Task content (Title/Description) changed -> Notify existing team
+    if (detailsChanged && previousAssignees.length > 0) {
+        await sendNotification({
+            recipients: previousAssignees, // Alerts everyone who was already working on it
+            senderId: req.user._id,
+            type: "TASK_DETAILS_UPDATED", // Context: Task context modification
+            message: `The details for your task "${updatedTask.title}" were updated by ${req.user.username}`,
+            projectId: updatedTask.project,
+            taskId: updatedTask._id
+        });
+    }
 
-    // 🔔 PLACE THE UPDATE NOTIFICATION TRIGGER HERE:
+    // SCENARIO B: Check if brand-new people were introduced in this update
     if (assignedTo && assignedTo.length > 0) {
-        // Map old assignees to strings so comparison loops work perfectly
-        const previousAssignees = oldTask.assignedTo.map(id => id.toString());
-
-        // Filter out anyone who was ALREADY on the task before this update
         const newlyAssignedMembers = assignedTo.filter(
             (memberId) => !previousAssignees.includes(memberId.toString())
         );
 
-        // Only fire if there are actually new people added!
         if (newlyAssignedMembers.length > 0) {
             await sendNotification({
-                recipients: newlyAssignedMembers, // Alerts ONLY the newcomers!
+                recipients: newlyAssignedMembers, // Welcomes only the newcomers
                 senderId: req.user._id,
                 type: "TASK_ASSIGNED",
-                message: `You have been added to the task card: "${updatedTask.title}" by ${req.user.username}`,
+                message: `You have been added to a new task card: "${updatedTask.title}" by ${req.user.username}`,
                 projectId: updatedTask.project,
                 taskId: updatedTask._id
             });
