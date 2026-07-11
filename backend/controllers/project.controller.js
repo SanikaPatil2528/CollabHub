@@ -2,6 +2,10 @@ import { Project } from "../models/project.model.js";
 import {ApiError} from "../utils/ApiError.js";
 import {ApiResponse} from "../utils/ApiResponse.js";
 import {asyncHandler} from "../utils/asyncHandler.js";
+import { Task } from "../models/task.model.js";
+import { Invitation } from "../models/invitation.model.js";
+import { Notification } from "../models/notification.model.js";
+import { Comment } from "../models/comment.model.js";
 
 
 export const createProject = asyncHandler(async(req,res)=>{
@@ -133,14 +137,26 @@ export const deleteProject = asyncHandler(async(req,res)=>{
     // RBAC Guard: Only owner can completely tear down the workspace
     if(project.owner.toString()!==req.user._id.toString()) throw new ApiError(402,"Fobidden: Only the project owner can delete this workspace");
 
-    // wipe the project out of the collection
-    await Project.findByIdAndDelete(projectId);
-
-    /* 💡 Production Expansion Note: 
+     /* 💡 Production Expansion Note: 
        When a project is deleted, you should ideally cascade-delete all child data 
        belonging to it (Tasks, Comments, Invitations) so you don't leave orphan 
        documents floating around in your MongoDB collections!
     */
+
+    // CASCADING TEARDOWN (Executed concurrently in parallel for max performance)
+    console.log(`[Teardown Engine] Initializing complete wipe for project: ${project.title}`);
+    
+    await Promise.all([
+        Task.deleteMany({ project: projectId }),         // Wipes all tasks on the Kanban board
+        Comment.deleteMany({ project: projectId }),      // Wipes all task-level & project-level comments
+        Invitation.deleteMany({ project: projectId }),   // Clears out pending or stale team invites
+        Notification.deleteMany({ project: projectId })  // Drops all relevant in-app alerts
+    ]);
+
+    console.log(`[Teardown Engine] Ecosystem wiped. Proceeding with project document removal.`);
+
+    // wipe the project out of the collection
+    await Project.findByIdAndDelete(projectId);
 
     return res
     .status(200)

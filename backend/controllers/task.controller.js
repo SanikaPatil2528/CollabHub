@@ -5,6 +5,7 @@ import {ApiResponse} from "../utils/ApiResponse.js";
 import {asyncHandler} from "../utils/asyncHandler.js";
 import { sendNotification } from "../utils/notificationHelper.js";
 import {Notification} from "../models/notification.model.js";
+import { Comment } from "../models/comment.model.js";
 
 
 export const createTask = asyncHandler(async(req,res)=>{
@@ -18,6 +19,31 @@ export const createTask = asyncHandler(async(req,res)=>{
 
     const isOwnerOrMember=project.owner.toString()===req.user._id.toString() || project.members.includes(req.user._id);
     if(!isOwnerOrMember) throw new ApiError(403,"Access Forbidden: You are not a collabarator of this project");
+
+    //  🛡️ VALIDATION LAYER: Ensure all assignees belong to the workspace
+    if (assignedTo && assignedTo.length > 0) {
+        if (!Array.isArray(assignedTo)) {
+            throw new ApiError(400, "assignedTo field must be a valid array of user IDs.");
+        }
+
+        // Build a set of all valid user IDs for this project workspace
+        const validWorkspaceUserIds = new Set([
+            project.owner.toString(),
+            ...project.members.map(id => id.toString())
+        ]);
+
+        // Verify if any assigned user falls outside the project workspace group
+        const invalidAssignees = assignedTo.filter(
+            (userId) => !validWorkspaceUserIds.has(userId.toString())
+        );
+
+        if (invalidAssignees.length > 0) {
+            throw new ApiError(
+                400, 
+                `Validation Failed: The following users do not belong to this project workspace: ${invalidAssignees.join(", ")}`
+            );
+        }
+    }
     
     const task=await Task.create({
         project:projectId,
@@ -111,7 +137,7 @@ export const updateTaskDetails=asyncHandler(async(req,res)=>{
     const task=await Task.findById(taskId);
     if(!task) throw new ApiError(404,"Task not found");
 
-    // 1. Snapshot the original state before updating
+    // Snapshot the original state before updating
     const previousAssignees = task.assignedTo.map(id => id.toString());
     const originalTitle = task.title;
     const originalDescription = task.description;
@@ -151,6 +177,28 @@ export const updateTaskDetails=asyncHandler(async(req,res)=>{
         if (!Array.isArray(assignedTo)) {
             throw new ApiError(400, "assignedTo field must be a valid array of user IDs.");
         }
+
+        // 🛡️ VALIDATION LAYER: Ensure all newly provided assignees belong to this project
+        if (assignedTo.length > 0) {
+            // Build a fast lookup set of authorized workspace users
+            const validWorkspaceUserIds = new Set([
+                project.owner.toString(),
+                ...project.members.map(id => id.toString())
+            ]);
+
+            // Filter out any user IDs that aren't parts of this workspace set
+            const invalidAssignees = assignedTo.filter(
+                (userId) => !validWorkspaceUserIds.has(userId.toString())
+            );
+
+            if (invalidAssignees.length > 0) {
+                throw new ApiError(
+                    400, 
+                    `Validation Failed: The following users do not belong to this project workspace: ${invalidAssignees.join(", ")}`
+                );
+            }
+        }
+
         task.assignedTo = assignedTo;
     }
 
@@ -229,6 +277,11 @@ export const deleteTask=asyncHandler(async(req,res)=>{
     if (!isOwnerOrMember) {
         throw new ApiError(403, "Access Forbidden: You cannot remove items from this project.");
     }
+
+    // RUN CASCADING TEARDOWN (Wipes all nested comments inside this taskId)
+    await Comment.deleteMany({ task: taskId });
+
+    console.log(`[Teardown Engine] Comments purged cleanly. Dropping task document.`);
 
     await Task.findByIdAndDelete(taskId);
 

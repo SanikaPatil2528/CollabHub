@@ -1,11 +1,14 @@
 import {asyncHandler} from "../utils/asyncHandler.js";
 import {ApiError} from "../utils/ApiError.js";
 import {ApiResponse} from "../utils/ApiResponse.js";
-import {User} from "../models/user.model.js";
-import {Invitation} from "../models/invitation.model.js";
-import {Project} from "../models/project.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import jwt from "jsonwebtoken";
+import { User } from "../models/user.model.js";
+import { Project } from "../models/project.model.js";
+import { Task } from "../models/task.model.js";
+import { Comment } from "../models/comment.model.js";
+import { Invitation } from "../models/invitation.model.js";
+import { Notification } from "../models/notification.model.js";
 
 
 export const registerUser = asyncHandler(async(req,res)=>{
@@ -255,4 +258,72 @@ export const getCurrentUser = asyncHandler(async(req,res)=>{
             "Current user fetched successfully"
         )
     );
+});
+
+export const deleteUserAccount= asyncHandler(async(req,res)=>{
+    const userId=req.user._id;
+    const userEmail=req.user.email;
+
+    console.log(`[Account Teardown] Beginning absolute purge for user: ${req.user.username}`);
+
+    // 1. Find all projects completely owned by this user
+    const ownedProjects = await Project.find({ owner: userId });
+    const ownedProjectIds = ownedProjects.map(proj => proj._id);
+
+    // 2.RUN BULK CASCADING TEARDOWN (Parallel execution for maximum performance)
+    await Promise.all([
+        // --- CASE A: Wiping everything connected to projects they owned ---
+        Task.deleteMany({ project: { $in: ownedProjectIds } }),
+        Comment.deleteMany({ project: { $in: ownedProjectIds } }),
+        Invitation.deleteMany({ project: { $in: ownedProjectIds } }),
+        Notification.deleteMany({ project: { $in: ownedProjectIds } }),
+        Project.deleteMany({ owner: userId }), // Drops the parent project hubs
+
+        // --- CASE B: Cleaning up their footprint in shared project hubs ---
+        // Pull their ID out of any project workspace members arrays where they were a contributor
+        Project.updateMany(
+            { members: userId },
+            { $pull: { members: userId } }
+        ),
+        
+        // Remove their ID from any task card assignees arrays across the entire app
+        Task.updateMany(
+            { assignedTo: userId },
+            { $pull: { assignedTo: userId } }
+        ),
+
+        // Clean out all workspace invitations sent to or sent from this user's email
+        Invitation.deleteMany({
+            $or: [
+                { inviteeEmail: userEmail },
+                { sender: userId }
+            ]
+        }),
+
+        // Permanently drop their personal notification inbox stream
+        Notification.deleteMany({ recipient: userId })
+    ]);
+
+    console.log(`[Account Teardown] Shared ecosystems decoupled. Deleting primary profile.`);
+
+    // Clear out the User record and security tokens from the database
+    await User.findByIdAndDelete(userId);
+
+    // Securely clear client-side HTTP-Only authentication cookies
+    const cookieOptions = {
+        httpOnly: true,
+        secure: true
+    };
+
+    return res
+        .status(200)
+        .clearCookie("accessToken", cookieOptions)
+        .clearCookie("refreshToken", cookieOptions)
+        .json(
+            new ApiResponse(
+                200, 
+                {}, 
+                "Your profile account and all associated managed workspaces have been permanently purged."
+            )
+        );
 });
