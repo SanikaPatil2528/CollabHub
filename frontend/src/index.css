@@ -1,1 +1,10 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  margin: 0;
+  background-color: #09090b; /* Zinc 950 dark background */
+  color: #f4f4f5; /* Zinc 100 text */
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
