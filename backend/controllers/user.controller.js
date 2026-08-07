@@ -327,3 +327,32 @@ export const deleteUserAccount= asyncHandler(async(req,res)=>{
             )
         );
 });
+
+export const searchUsersByUsername = asyncHandler(async (req, res) => {
+    const { q } = req.query;
+
+    if (!q || q.trim() === "") {
+        return res
+            .status(200)
+            .json(new ApiResponse(200, [], "No query string provided."));
+    }
+
+    // 2. Query matching profiles by username (case-insensitive)
+    // Exclude the current logged-in user from the search list
+    const matchingUsers = await User.find({
+        username: { $regex: q.trim(), $options: "i" },
+        _id: { $ne: req.user._id } 
+    })
+    .select("username email fullName avatar bio skills")
+    .limit(10); // Boundary cap to prevent massive database reads
+
+    return res
+        .status(200)
+        .json(
+            new ApiResponse(
+                200,
+                matchingUsers,
+                "Matching team members retrieved successfully."
+            )
+        );
+});
